@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Torizon Photo Booth</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main>
+    <div class="stage">
+      <img id="live" src="/preview.mjpg" alt="">
+      <img id="reveal" class="reveal" alt="">
+      <div class="overlay" id="overlay">
+        <div class="prompt" id="prompt">Looking for a face…</div>
+        <div class="meter" id="meter" hidden><div class="meter-fill" id="meter-fill"></div></div>
+        <div class="working" id="working" hidden><span class="spinner"></span><span id="working-text"></span></div>
+      </div>
+      <div class="caption" id="caption"></div>
+    </div>
+
+    <aside class="side">
+      <div class="logos" id="logos">
+        <img src="/static/logos.png" alt="Torizon and NVIDIA Jetson"
+             onerror="document.getElementById('logos').hidden = true">
+      </div>
+      <div class="brand">PHOTO BOOTH</div>
+      <div class="side-label">Tap a photo to see it again</div>
+      <div class="gallery" id="gallery"></div>
+      <div class="side-foot">
+        <span class="stat"><b id="stat-count">0</b> photos</span>
+        <span class="stat privacy">on-device · never uploaded</span>
+      </div>
+    </aside>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
