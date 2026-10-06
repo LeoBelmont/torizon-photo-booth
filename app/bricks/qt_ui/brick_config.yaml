@@ -1,0 +1,14 @@
+id: qt_ui
+name: Qt UI (KMS)
+description: Native Qt 6 photo booth panel drawn straight to the board display through EGLFS/KMS.
+category: ui
+variables:
+  - name: "QT_UI_IMAGE"
+    description: "Container image of the Qt panel"
+    default_value: "lbornia/ventuno-demo-booth-ui:latest"
+  - name: "QT_QPA_PLATFORM"
+    description: "eglfs draws straight to KMS (board without a desktop). wayland renders into an existing compositor, see WAYLAND_SOCKET"
+    default_value: "eglfs"
+  - name: "WAYLAND_SOCKET"
+    description: "Only with QT_QPA_PLATFORM=wayland: absolute path of the compositor socket"
+    default_value: "/run/user/1000/wayland-0"

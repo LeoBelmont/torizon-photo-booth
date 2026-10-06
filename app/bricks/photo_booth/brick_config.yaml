@@ -1,0 +1,16 @@
+id: photo_booth
+name: Photo Booth backend
+description: Camera, smile trigger and face swap on the Hexagon NPU, exposed over HTTP (state, MJPEG preview, photos).
+category: video
+# No `ports:` here: the orchestrator would publish them on the App's main container too,
+# clashing with the booth service, which publishes 8080 itself in brick_compose.yaml.
+variables:
+  - name: "BOOTH_IMAGE"
+    description: "Container image of the booth backend"
+    default_value: "lbornia/ventuno-demo-booth:latest"
+  - name: "CAMERA_DEVICE"
+    description: "Pin one V4L2 node, e.g. /dev/video2. Empty: first USB camera found, bundled portraits if none"
+    default_value: ""
+  - name: "CAMERA_WAIT_S"
+    description: "Seconds to wait for a camera at start before falling back to the bundled portraits"
+    default_value: "6"

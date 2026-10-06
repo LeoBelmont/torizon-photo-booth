@@ -1,0 +1,62 @@
+# Bring-up of the photo booth on a board without the Arduino App Lab runtime: the two
+# Brick containers, as the orchestrator would start them. Keep next to app/.
+#
+#   scp -r app docker-compose.ventunoq.yml arduino@<board>:~/photo-booth/
+#   ssh arduino@<board> 'cd photo-booth && docker compose -f docker-compose.ventunoq.yml up'
+#
+# Display: EGLFS needs the DRM device, stop the desktop first (`sudo systemctl stop
+# display-manager`) or run with QT_QPA_PLATFORM=wayland inside a desktop session.
+services:
+  booth:
+    image: ${BOOTH_IMAGE:-lbornia/ventuno-demo-booth:latest}
+    environment:
+      CAMERA_DEVICE: ${CAMERA_DEVICE:-}
+      CAMERA_WAIT_S: "6"
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    devices:
+      - /dev/dma_heap/system
+      - /dev/fastrpc-cdsp
+      - /dev/fastrpc-cdsp-secure   # the HTP backend opens this one too, and fails without it
+    volumes:
+      - /dev:/dev
+      - /sys:/sys:ro
+      - /sys/firmware/devicetree/base/model:/run/device-model:ro
+      - /usr/share/qcom:/run/host-qcom:ro
+      - booth-npu-cache:/cache
+    device_cgroup_rules:
+      - "c 81:* rmw"
+    # The App Lab orchestrator runs this as uid 1000 with the video/fastrpc/dmaheap groups;
+    # without it, root is the simple way to reach the camera and the NPU.
+    user: root
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/state', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 15s
+
+  qt-ui:
+    image: ${QT_UI_IMAGE:-lbornia/ventuno-demo-booth-ui:latest}
+    user: root
+    depends_on:
+      booth:
+        condition: service_healthy
+    environment:
+      BOOTH_URL: http://booth:8080
+      QT_QPA_PLATFORM: ${QT_QPA_PLATFORM:-eglfs}
+      WAYLAND_SOCKET: /run/user/1000/wayland-0
+      QSG_INFO: ${QSG_INFO:-0}
+    volumes:
+      - /dev:/dev
+      - /run/udev:/run/udev:ro
+      - /tmp:/tmp
+      - /run/user/1000:/run/user/1000
+    device_cgroup_rules:
+      - "c 226:* rmw"
+      - "c 13:* rmw"
+      - "c 4:* rmw"
+
+volumes:
+  booth-npu-cache: {}

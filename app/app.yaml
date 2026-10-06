@@ -1,0 +1,14 @@
+name: Torizon Photo Booth
+description: Smile at the camera. The VENTUNO Q puts your face into a character portrait on its Hexagon NPU and shows it on the display with a native Qt UI. Everything on the board, nothing uploaded.
+icon: 📸
+bricks:
+  - photo_booth:
+      variables:
+        BOOTH_IMAGE: "lbornia/ventuno-demo-booth:latest"
+        CAMERA_DEVICE: ""
+        CAMERA_WAIT_S: "6"
+  - qt_ui:
+      variables:
+        QT_UI_IMAGE: "lbornia/ventuno-demo-booth-ui:latest"
+        QT_QPA_PLATFORM: "eglfs"
+        WAYLAND_SOCKET: "/run/user/1000/wayland-0"

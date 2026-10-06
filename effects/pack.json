@@ -1,0 +1,52 @@
+{
+  "pack": "classic",
+  "version": "10.0.0",
+  "notes": "the visitor's real identity is transferred into a character portrait, so the result is always recognisably them in someone else's costume. templates are generated characters, never real people, because this booth photographs the public.",
+  "effects": [
+    {
+      "id": "renaissance",
+      "label": "Renaissance Portrait",
+      "template": "renaissance"
+    },
+    {
+      "id": "pharaoh",
+      "label": "Pharaoh",
+      "template": "pharaoh"
+    },
+    {
+      "id": "knight",
+      "label": "Knight",
+      "template": "knight"
+    },
+    {
+      "id": "samurai",
+      "label": "Samurai",
+      "template": "samurai"
+    },
+    {
+      "id": "pirate",
+      "label": "Pirate",
+      "template": "pirate"
+    },
+    {
+      "id": "cowboy",
+      "label": "Cowboy",
+      "template": "cowboy"
+    },
+    {
+      "id": "astronaut",
+      "label": "Astronaut",
+      "template": "astronaut"
+    },
+    {
+      "id": "wizard",
+      "label": "Wizard",
+      "template": "wizard"
+    },
+    {
+      "id": "yearbook",
+      "label": "1970s Yearbook",
+      "template": "yearbook"
+    }
+  ]
+}

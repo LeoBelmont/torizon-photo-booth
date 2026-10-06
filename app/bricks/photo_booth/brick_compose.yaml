@@ -1,0 +1,37 @@
+# The booth backend. The NPU wiring (devices, DSP firmware mounts) is the same as
+# Arduino's own NPU bricks use; the camera comes in through /dev/video*.
+services:
+  booth:
+    image: ${BOOTH_IMAGE:-lbornia/ventuno-demo-booth:latest}
+    environment:
+      CAMERA_DEVICE: ${CAMERA_DEVICE:-}
+      CAMERA_WAIT_S: ${CAMERA_WAIT_S:-6}
+      PORT: "8080"
+    ports:
+      - "8080:8080"   # the booth API on the board too: snap.sh, or a browser for debugging
+    devices:
+      - /dev/dma_heap/system
+      - /dev/fastrpc-cdsp
+      - /dev/fastrpc-cdsp-secure   # the HTP backend opens this one too, and fails without it
+    volumes:
+      - /dev:/dev                   # USB camera discovery over /dev/video*
+      - /sys:/sys:ro                # V4L2 sysfs, to pin a camera to a USB port
+      - /sys/firmware/devicetree/base/model:/run/device-model:ro
+      - ${HOST_DSP_INSTALLATION_PATH:-/usr/share/qcom}:/run/host-qcom:ro
+      - booth-npu-cache:/cache      # compiled NPU graphs, so later starts are quick
+    device_cgroup_rules:
+      - "c 81:* rmw"                # video4linux
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/state', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  booth-npu-cache: {}
