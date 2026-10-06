@@ -78,9 +78,9 @@ Three things are easy to get wrong:
 | `booth/` | The backend. `sources.py` camera, `smile.py` + `expression.py` trigger, `faceswap.py` the swap, `ortrun.py` the NPU/CPU runner, `app.py` state machine and HTTP server. |
 | `qt-ui/` | The panel: `BoothClient`, `MjpegView`, `qml/Main.qml`, its `Dockerfile`, Torizon and Arduino marks. |
 | `Dockerfile` | The booth image, on Arduino's `qairt-common-base`. |
-| `docker-compose.yml` | The two containers for a board without the App Lab runtime. Keep it next to `app/`. |
+| `docker-compose.yml` | The two containers on their own, for bring-up and debugging. Not the way the demo runs. |
 | `runtime/` | The App Lab runtime (`arduino-app-cli`, `arduino-router`) as a container, so Torizon OS needs nothing installed into the rootfs. |
-| `scripts/` | `build-booth.sh`, `build-qt-ui.sh`, `export-app.sh`. |
+| `scripts/` | `photo-booth.sh` to run the App on either board, plus `build-booth.sh`, `build-qt-ui.sh`, `export-app.sh`. |
 | `effects/`, `templates/` | The effect pack and the character portraits it names. |
 
 ## Building
@@ -99,57 +99,49 @@ SSH instead of going through a registry. Both build for arm64, under emulation o
 
 ## Running
 
-The panel draws straight to KMS, so whatever else is on the board must not hold the
-display.
+The demo runs as an **Arduino App** on both boards, from the same App folder and with the
+same commands. The only thing that differs is where the App Lab runtime comes from: the
+Arduino image has it installed, and on Torizon OS it runs from a container.
 
-### On Torizon OS
+```sh
+scripts/photo-booth.sh install
+scripts/photo-booth.sh start
+scripts/photo-booth.sh logs
+scripts/photo-booth.sh stop
+```
 
-The main target, and the simple case: no desktop, so nothing to move aside. If the image
-starts the usual Weston container, stop that first.
+The script picks the right path for the board it is on, so there is nothing to change
+between the two. Underneath, both are ordinary `arduino-app-cli` commands against
+`app/`, and `scripts/photo-booth.sh cli <args>` passes anything else straight through.
+
+The panel draws straight to KMS and needs the display to itself. On Torizon that is
+already the case. On the Arduino image a desktop is running, so the script says what to do
+about it rather than stopping it behind your back: either stop the desktop, or set the
+`qt_ui` Brick's `QT_QPA_PLATFORM` to `wayland` and let the panel open as a window inside it.
+
+### What happens on each board
+
+On the **Arduino image**, `arduino-app-cli` is already installed, so the script uses it and
+the App lands in `~/ArduinoApps/photo-booth`. App Lab on a PC sees the App too, so you can
+open it, edit it and press Run.
+
+On **Torizon OS**, there is no `arduino-app-cli` in the rootfs and no way to apt-install
+one. The script brings up `runtime/compose.yml` instead, which runs the runtime in a
+container, and the App lands in `/var/lib/arduino-apps/apps/photo-booth`. Everything after
+that is identical, including the Bricks, the sketch and the Bridge to the microcontroller.
+See [runtime/README.md](runtime/README.md) for how that container is wired, and
+[what a Torizon build still needs](#what-a-torizon-os-build-needs) for the kernel side.
+
+### Without App Lab at all
+
+`docker-compose.yml` starts the booth and the panel on their own, with no runtime, no
+Bricks, no sketch and no microcontroller. It is there for bring-up and for debugging the
+two containers in isolation, not as the way to run the demo.
 
 ```sh
 scp -r app docker-compose.yml torizon@<board-ip>:~/photo-booth/
-ssh torizon@<board-ip>
-docker stop weston 2>/dev/null || true    # only if this image runs one
-cd photo-booth && docker compose up
+ssh torizon@<board-ip> 'cd photo-booth && docker compose up'
 ```
-
-Torizon OS does not carry `arduino-app-cli`, so the compose file above is the direct way
-in. To run the App the way App Lab does, with the Bricks orchestrated and the sketch
-flashed, bring up the runtime in a container instead and use it normally:
-
-```sh
-docker compose -f runtime/compose.yml up -d
-docker compose -f runtime/compose.yml exec arduino-app-cli arduino-app-cli app start /var/lib/arduino-apps/apps/photo-booth
-```
-
-That is what makes the move a copy rather than a port: nothing is installed into the OS.
-See [runtime/README.md](runtime/README.md), and
-[what a Torizon build still needs](#what-a-torizon-os-build-needs) below.
-
-### On the stock Ubuntu image
-
-GDM owns the display whenever a monitor is attached, even sitting at the login screen, so
-free it first:
-
-```sh
-sudo systemctl stop display-manager                 # for now
-sudo systemctl set-default multi-user.target        # or for good
-```
-
-Then run it as an Arduino App. Copy `app/` to `/home/arduino/ArduinoApps/photo-booth`, or
-run `scripts/export-app.sh` and import the zip in Arduino App Lab, then press **Run**, or:
-
-```sh
-arduino-app-cli app start ~/ArduinoApps/photo-booth
-arduino-app-cli app logs  ~/ArduinoApps/photo-booth --follow
-```
-
-The compose file above works here too, with user `arduino`.
-
-To leave the desktop running and show the panel as a window inside it, set the `qt_ui`
-Brick's `QT_QPA_PLATFORM` to `wayland` rather than stopping GDM. The panel then renders
-into the session's compositor through `/run/user/1000/wayland-0`.
 
 ### Taking a photo without smiling
 

@@ -15,40 +15,25 @@ written to disk.
 
 ## Starting it
 
-The panel takes the display for itself, so nothing else may be drawing on it.
-
-### On Torizon OS
-
-No desktop runs there, so there is nothing to move aside. The booth and the panel come up
-from the compose file in `~/photo-booth`:
+The same two commands on either board:
 
 ```bash
-ssh torizon@<board-ip>
-cd photo-booth
-docker compose up -d        # add: docker stop weston   first, if this image runs one
+scripts/photo-booth.sh install
+scripts/photo-booth.sh start
 ```
 
-To stop it: `docker compose down`. To have it come back after a power cut, add
-`restart: unless-stopped` to both services, or let Torizon's own `docker-compose` service
-start it at boot.
+The script works out where the App Lab runtime comes from. On Torizon OS it starts it from
+a container first; on the Arduino image it uses the one already installed. Stop the demo
+with `scripts/photo-booth.sh stop`, and watch it with `scripts/photo-booth.sh logs`.
 
-### On the stock Ubuntu image
+The panel needs the display to itself. On Torizon nothing is holding it. On the Arduino
+image the desktop is, and the script will tell you so; stop it with
+`sudo systemctl stop display-manager`, or re-run with `FREE_DISPLAY=1` to have the script
+do it.
 
-The desktop holds the display even at the login screen, so free it first:
-
-```bash
-ssh arduino@<board-ip>
-sudo systemctl stop display-manager
-arduino-app-cli app start ~/ArduinoApps/photo-booth
-```
-
-The App is installed at `/home/arduino/ArduinoApps/photo-booth`; from Arduino App Lab you
-can just open it and press **Run**. To stop it:
-`arduino-app-cli app stop ~/ArduinoApps/photo-booth`.
-
-To have it come up on its own after a power cut, enable **Run at Startup** in App Lab and
-keep the desktop out of the way with `sudo systemctl set-default multi-user.target`.
-`sudo systemctl start display-manager` brings the desktop back when you want it.
+To have the demo come back after a power cut, enable **Run at Startup** in App Lab, or on
+Torizon let the runtime compose file start with Docker and set the App as the default with
+`scripts/photo-booth.sh cli properties set default /var/lib/arduino-apps/apps/photo-booth`.
 
 ## First start
 
@@ -100,8 +85,8 @@ that check.
 
 | What you see | What to do |
 | --- | --- |
-| Black screen, no panel | Something else holds the display. On Torizon, stop the Weston container; on Ubuntu, `sudo systemctl stop display-manager`. Then restart. The panel's log says `Failed to commit atomic request (code=-13)` in this case. |
-| "Warming up…" for more than a minute | Check the booth log: `docker compose logs booth`, or `arduino-app-cli app logs ~/ArduinoApps/photo-booth --tail 40`. If it says the NPU was not reached, the booth is on the CPU and photos take about 4 s. |
+| Black screen, no panel | Something else holds the display. On Torizon, stop the Weston container; on the Arduino image, `sudo systemctl stop display-manager`. Then `scripts/photo-booth.sh start` again. The panel's log says `Failed to commit atomic request (code=-13)` in this case. |
+| "Warming up…" for more than a minute | `scripts/photo-booth.sh logs`. If it says the NPU was not reached, the booth is on the CPU and photos take about 4 s. |
 | "Waiting for a face" with a camera plugged in | Check the camera is a UVC model and appears as `/dev/video0`. The board's own `/dev/video32` and `/dev/video33` are codecs, not cameras. |
 | Photos take about 4 s | The face swap fell back to the CPU. The logs name the reason. |
 

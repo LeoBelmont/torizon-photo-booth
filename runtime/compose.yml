@@ -47,8 +47,11 @@ services:
     depends_on:
       - arduino-router
     environment:
-      ARDUINO_APP_CLI__APPS_DIR: /var/lib/arduino-apps/apps
-      ARDUINO_APP_CLI__RELEASES_DIR: /var/lib/arduino-apps/releases
+      # APPS_ROOT moves all of this elsewhere; it only has to be one path, because the
+      # same path has to exist on the host and here. See the note above.
+      ARDUINO_APP_CLI__APPS_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/apps
+      ARDUINO_APP_CLI__RELEASES_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/releases
+      APP_HOME_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/home
       ARDUINO_APP_CLI__DATA_DIR: /var/lib/arduino-app-cli
       # Where the router's socket is, in the form the runtime looks for it.
       ARDUINO_APP_CLI__REQUIRED_RUNTIMES: arduino/arduino-router
@@ -65,7 +68,7 @@ services:
       # Flashing the sketch, and the serial and video nodes.
       - /dev:/dev
       # Identical paths on both sides. The App folders live here.
-      - /var/lib/arduino-apps:/var/lib/arduino-apps
+      - ${APPS_ROOT:-/var/lib/arduino-apps}:${APPS_ROOT:-/var/lib/arduino-apps}
       - /var/lib/arduino-app-cli:/var/lib/arduino-app-cli
       - /run/arduino:/run/arduino
       # Probed with "mount this if the board has it", so it has to be visible here too.
