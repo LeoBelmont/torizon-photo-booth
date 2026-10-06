@@ -1,0 +1,77 @@
+# The Arduino App Lab runtime as two containers, so an Arduino App runs on a board that
+# never had the Debian packages installed. This is what makes the move to Torizon OS a
+# copy rather than a port.
+#
+#   docker compose -f runtime/compose.yml up -d
+#   docker compose -f runtime/compose.yml exec arduino-app-cli arduino-app-cli app list
+#
+# Why the mounts look like this: arduino-app-cli creates the App's containers through the
+# host's Docker socket, as siblings of this one, so the paths it writes into the generated
+# compose files are host paths, while the host facts it resolves are read from inside this
+# container. The two only agree if
+#
+#   * the apps, releases and data directories are bind-mounted at identical paths,
+#   * /etc/group and /etc/passwd come from the host, because the runtime turns group names
+#     like video or render into numeric ids with a lookup inside this container,
+#   * /sys is visible, for the device major numbers it writes into cgroup rules and for
+#     the device tree it identifies the board from,
+#   * anything it probes with "mount this if the board has it" is visible at the same
+#     path, which is why /usr/share/qcom and /run/user/1000 are here.
+
+services:
+  # Bridges the App's Python to the microcontroller. Drop this service on a board with no
+  # MCU; Python-only Apps do not need it.
+  arduino-router:
+    image: ${RUNTIME_IMAGE:-lbornia/arduino-app-runtime:latest}
+    command: ["router"]
+    network_mode: host
+    environment:
+      # VENTUNO Q: the STM32H5 is on /dev/ttySTM0. Leave empty for no microcontroller.
+      SERIAL_PORT: ${SERIAL_PORT:-/dev/ttySTM0}
+      SERIAL_BAUDRATE: "115200"
+      # Put the micro in a ready state, as the board's own systemd drop-in does.
+      MCU_READY_GPIO: ${MCU_READY_GPIO:--c2 -t0 47=0}
+    volumes:
+      - /dev:/dev
+      # The socket lands on the host here, so the App's containers can mount it.
+      - /run/arduino:/run/arduino
+    device_cgroup_rules:
+      - "c 4:* rmw"     # tty
+      - "c 254:* rmw"   # gpiochip
+    restart: unless-stopped
+
+  arduino-app-cli:
+    image: ${RUNTIME_IMAGE:-lbornia/arduino-app-runtime:latest}
+    command: ["daemon"]
+    network_mode: host
+    depends_on:
+      - arduino-router
+    environment:
+      ARDUINO_APP_CLI__APPS_DIR: /var/lib/arduino-apps/apps
+      ARDUINO_APP_CLI__RELEASES_DIR: /var/lib/arduino-apps/releases
+      ARDUINO_APP_CLI__DATA_DIR: /var/lib/arduino-app-cli
+      # Where the router's socket is, in the form the runtime looks for it.
+      ARDUINO_APP_CLI__REQUIRED_RUNTIMES: arduino/arduino-router
+      ARDUINO_APP_CLI__ALLOW_ROOT: "1"
+      DAEMON_PORT: "8800"
+    volumes:
+      # Creates the App's containers on the host.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Group and user names must resolve to the host's numeric ids.
+      - /etc/group:/etc/group:ro
+      - /etc/passwd:/etc/passwd:ro
+      # Device majors, and the device tree the board is identified from.
+      - /sys:/sys:ro
+      # Flashing the sketch, and the serial and video nodes.
+      - /dev:/dev
+      # Identical paths on both sides. The App folders live here.
+      - /var/lib/arduino-apps:/var/lib/arduino-apps
+      - /var/lib/arduino-app-cli:/var/lib/arduino-app-cli
+      - /run/arduino:/run/arduino
+      # Probed with "mount this if the board has it", so it has to be visible here too.
+      - /usr/share/qcom:/usr/share/qcom:ro
+      - /run/user/1000:/run/user/1000
+    device_cgroup_rules:
+      - "c 4:* rmw"     # tty, for flashing
+      - "c 254:* rmw"   # gpiochip, for the micro's reset line
+    restart: unless-stopped

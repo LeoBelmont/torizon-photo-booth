@@ -79,6 +79,7 @@ Three things are easy to get wrong:
 | `qt-ui/` | The panel: `BoothClient`, `MjpegView`, `qml/Main.qml`, its `Dockerfile`, Torizon and Arduino marks. |
 | `Dockerfile` | The booth image, on Arduino's `qairt-common-base`. |
 | `docker-compose.yml` | The two containers for a board without the App Lab runtime. Keep it next to `app/`. |
+| `runtime/` | The App Lab runtime (`arduino-app-cli`, `arduino-router`) as a container, so Torizon OS needs nothing installed into the rootfs. |
 | `scripts/` | `build-booth.sh`, `build-qt-ui.sh`, `export-app.sh`. |
 | `effects/`, `templates/` | The effect pack and the character portraits it names. |
 
@@ -113,10 +114,18 @@ docker stop weston 2>/dev/null || true    # only if this image runs one
 cd photo-booth && docker compose up
 ```
 
-Torizon OS does not carry `arduino-app-cli` yet, so the compose file is the way in. Once
-the runtime is packaged for it, the App Lab route below works there unchanged. What else
-a Torizon build has to provide is listed under
-[What a Torizon OS build needs](#what-a-torizon-os-build-needs).
+Torizon OS does not carry `arduino-app-cli`, so the compose file above is the direct way
+in. To run the App the way App Lab does, with the Bricks orchestrated and the sketch
+flashed, bring up the runtime in a container instead and use it normally:
+
+```sh
+docker compose -f runtime/compose.yml up -d
+docker compose -f runtime/compose.yml exec arduino-app-cli arduino-app-cli app start /var/lib/arduino-apps/apps/photo-booth
+```
+
+That is what makes the move a copy rather than a port: nothing is installed into the OS.
+See [runtime/README.md](runtime/README.md), and
+[what a Torizon build still needs](#what-a-torizon-os-build-needs) below.
 
 ### On the stock Ubuntu image
 
@@ -156,9 +165,9 @@ BOOTH=http://<board-ip>:8080 ./snap.sh --watch   # follow the state
 
 ## What a Torizon OS build needs
 
-Once `arduino-app-cli` is on the board, a release built on the stock image with
-`arduino-app-cli app build --target ventunoq` installs with `app install`. What the
-Torizon build has to provide: Docker 25 or newer,
+With the runtime in a container (`runtime/`), the OS itself only has to provide Docker and
+the kernel side. A release built on the stock image with
+`arduino-app-cli app build --target ventunoq` then installs with `app install`: Docker 25 or newer,
 `arduino-app-cli` and `arduino-router` with their uid 1000 user and groups, a device tree
 that keeps the `arduino,monza` compatible string (or a `platform.json` override so the CLI
 recognises the board), the `drm/msm` kernel driver with Adreno 623 for the panel, and the
