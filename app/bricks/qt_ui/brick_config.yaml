@@ -7,7 +7,7 @@ variables:
     description: "Container image of the Qt panel"
     default_value: "lbornia/ventuno-demo-booth-ui:latest"
   - name: "QT_QPA_PLATFORM"
-    description: "eglfs draws straight to KMS (board without a desktop). wayland renders into an existing compositor, see WAYLAND_SOCKET"
+    description: "eglfs draws straight to KMS: the default, and what Torizon OS and any headless board want. wayland renders into an existing compositor instead, e.g. a desktop session, see WAYLAND_SOCKET"
     default_value: "eglfs"
   - name: "WAYLAND_SOCKET"
     description: "Only with QT_QPA_PLATFORM=wayland: absolute path of the compositor socket"

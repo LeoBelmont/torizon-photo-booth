@@ -1,11 +1,15 @@
-# Bring-up of the photo booth on a board without the Arduino App Lab runtime: the two
-# Brick containers, as the orchestrator would start them. Keep next to app/.
+# The photo booth on a board without the Arduino App Lab runtime: the two Brick
+# containers, as the orchestrator would start them. This is the way in on Torizon OS,
+# which does not carry arduino-app-cli yet. Keep this file next to app/.
 #
-#   scp -r app docker-compose.ventunoq.yml arduino@<board>:~/photo-booth/
-#   ssh arduino@<board> 'cd photo-booth && docker compose -f docker-compose.ventunoq.yml up'
+#   scp -r app docker-compose.yml torizon@<board>:~/photo-booth/
+#   ssh torizon@<board> 'cd photo-booth && docker compose up'
 #
-# Display: EGLFS needs the DRM device, stop the desktop first (`sudo systemctl stop
-# display-manager`) or run with QT_QPA_PLATFORM=wayland inside a desktop session.
+# Display: the panel draws straight to KMS, so it needs the DRM device to itself. On a
+# headless Torizon image nothing holds it; stop a Weston container if the image starts
+# one. On a board running a desktop (the stock Ubuntu image), either stop the desktop
+# with `sudo systemctl stop display-manager`, or run with QT_QPA_PLATFORM=wayland to
+# open the panel as a window of the session instead.
 services:
   booth:
     image: ${BOOTH_IMAGE:-lbornia/ventuno-demo-booth:latest}

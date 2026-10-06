@@ -9,8 +9,10 @@ the face swap runs on the board's **Hexagon NPU**, and a native **Qt 6** panel r
 the Weston + Chromium pair of the Jetson build. The Jetson/TensorRT version lives on
 `main`; the two share no files here.
 
-The same App is meant to run unchanged on the VENTUNO Q's stock Ubuntu image and on a
-Torizon OS build for the board, which is the
+**Torizon OS is the target.** The board has no desktop there, which is what the panel
+wants: it takes the display directly, with no compositor in the way. The same App also
+runs on the VENTUNO Q's stock Ubuntu image, where the desktop has to be moved aside
+first. Running unchanged on both is the
 [Works with Arduino](https://www.arduino.cc/pro/works-with-arduino/) story on Toradex
 hardware.
 
@@ -96,29 +98,49 @@ SSH instead of going through a registry. Both build for arm64, under emulation o
 
 ## Running
 
-### As an Arduino App
+The panel draws straight to KMS, so whatever else is on the board must not hold the
+display.
 
-Copy `app/` to `/home/arduino/ArduinoApps/photo-booth`, or run `scripts/export-app.sh` and
-import the zip in Arduino App Lab. Then press **Run**, or from a shell on the board:
+### On Torizon OS
+
+The main target, and the simple case: no desktop, so nothing to move aside. If the image
+starts the usual Weston container, stop that first.
+
+```sh
+scp -r app docker-compose.yml torizon@<board-ip>:~/photo-booth/
+ssh torizon@<board-ip>
+docker stop weston 2>/dev/null || true    # only if this image runs one
+cd photo-booth && docker compose up
+```
+
+Torizon OS does not carry `arduino-app-cli` yet, so the compose file is the way in. Once
+the runtime is packaged for it, the App Lab route below works there unchanged. What else
+a Torizon build has to provide is listed under
+[What a Torizon OS build needs](#what-a-torizon-os-build-needs).
+
+### On the stock Ubuntu image
+
+GDM owns the display whenever a monitor is attached, even sitting at the login screen, so
+free it first:
+
+```sh
+sudo systemctl stop display-manager                 # for now
+sudo systemctl set-default multi-user.target        # or for good
+```
+
+Then run it as an Arduino App. Copy `app/` to `/home/arduino/ArduinoApps/photo-booth`, or
+run `scripts/export-app.sh` and import the zip in Arduino App Lab, then press **Run**, or:
 
 ```sh
 arduino-app-cli app start ~/ArduinoApps/photo-booth
 arduino-app-cli app logs  ~/ArduinoApps/photo-booth --follow
 ```
 
-The panel needs the display to itself, so stop the desktop first with
-`sudo systemctl stop display-manager`. To show the panel as a window inside a running
-desktop session instead, set the `qt_ui` Brick's `QT_QPA_PLATFORM` variable to `wayland`.
+The compose file above works here too, with user `arduino`.
 
-### Without the App Lab runtime
-
-The same two containers, from a plain compose file. Useful for bring-up, and for a Torizon
-OS build of the board where `arduino-app-cli` is not installed yet.
-
-```sh
-scp -r app docker-compose.yml arduino@<board-ip>:~/photo-booth/
-ssh arduino@<board-ip> 'sudo systemctl stop display-manager; cd photo-booth && docker compose up'
-```
+To leave the desktop running and show the panel as a window inside it, set the `qt_ui`
+Brick's `QT_QPA_PLATFORM` to `wayland` rather than stopping GDM. The panel then renders
+into the session's compositor through `/run/user/1000/wayland-0`.
 
 ### Taking a photo without smiling
 
@@ -132,10 +154,11 @@ BOOTH=http://<board-ip>:8080 ./snap.sh --watch   # follow the state
 
 `/api/state` reports `device: npu` once the sessions are up, `warming` before that.
 
-## On Torizon OS
+## What a Torizon OS build needs
 
-Build a release on the stock image with `arduino-app-cli app build --target ventunoq` and
-install the `.ard` on the Torizon board. What that build has to provide: Docker 25 or newer,
+Once `arduino-app-cli` is on the board, a release built on the stock image with
+`arduino-app-cli app build --target ventunoq` installs with `app install`. What the
+Torizon build has to provide: Docker 25 or newer,
 `arduino-app-cli` and `arduino-router` with their uid 1000 user and groups, a device tree
 that keeps the `arduino,monza` compatible string (or a `platform.json` override so the CLI
 recognises the board), the `drm/msm` kernel driver with Adreno 623 for the panel, and the

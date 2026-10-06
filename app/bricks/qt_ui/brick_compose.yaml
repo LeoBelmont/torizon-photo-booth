@@ -1,5 +1,7 @@
 # The Qt panel, drawing straight to KMS/DRM through EGLFS: it owns the display, so the
-# board must not run a desktop or Weston. Reads the booth over the compose network.
+# board must not run a desktop or a compositor. That is the normal state on Torizon OS;
+# on a desktop image stop the desktop, or set QT_QPA_PLATFORM=wayland to render into it.
+# Reads the booth over the compose network.
 services:
   qt_ui:
     image: ${QT_UI_IMAGE:-lbornia/ventuno-demo-booth-ui:latest}
