@@ -57,10 +57,30 @@ Everything left is kernel and firmware, which no container can provide:
 - the panel needs `drm/msm` with Adreno 623 for hardware rendering;
 - the microcontroller needs its serial port, `/dev/ttySTM0` on the VENTUNO Q.
 
-Board identity is the one soft spot: the runtime reads the device tree `compatible` string
-and expects `arduino,monza`. If a Torizon device tree reports something else, drop a
-`platform.json` naming the board into the data directory, which is a host file the
-container picks up.
+## Board identity
+
+The runtime reads the device tree `compatible` string and expects `arduino,monza` for the
+VENTUNO Q. If the Torizon device tree reports something else, the log says so:
+
+```
+WARN not supported platform compatible=[...]
+```
+
+A `platform.json` in the data directory overrides it, which is a host file the container
+picks up at `/var/lib/arduino-app-cli/platform.json`:
+
+```json
+{
+  "board_name": "ventunoq",
+  "fqbn": "arduino:zephyr:ventunoq"
+}
+```
+
+The log then reads `loaded override from platform.json file`. Note what the override does
+**not** carry: the microcontroller's reset pin, which only comes from recognising the board
+properly. So the override is enough to run the Linux half of an App, and flashing the
+sketch still wants the device tree to identify the board. Keeping `arduino,monza` in the
+Torizon device tree avoids the whole question.
 
 ## Settings
 
