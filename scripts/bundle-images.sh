@@ -21,6 +21,15 @@ IMAGES=(
     "$REGISTRY/ventuno-demo-booth-ui:latest"
     "$REGISTRY/ventuno-demo-booth:latest"
 )
+# Included when it has been built. Only a board with no network needs it.
+TOOLCHAIN="$REGISTRY/ventuno-demo-toolchain:latest"
+if docker image inspect "$TOOLCHAIN" >/dev/null 2>&1; then
+    IMAGES+=("$TOOLCHAIN")
+    WITH_TOOLCHAIN=1
+else
+    WITH_TOOLCHAIN=0
+    echo "note: no $TOOLCHAIN built, so the bundle will need network for the sketch"
+fi
 
 for i in "${IMAGES[@]}"; do
     arch=$(docker image inspect "$i" --format '{{.Architecture}}' 2>/dev/null) || {
@@ -36,6 +45,7 @@ echo "==> saving $(( ${#IMAGES[@]} )) images, this takes a few minutes"
 docker save "${IMAGES[@]}" | gzip -1 > "$work/images.tar.gz"
 
 cp "$REPO/deploy/compose.yml" "$work/compose.yml"
+[ "$WITH_TOOLCHAIN" = "1" ] && cp "$REPO/deploy/compose.offline.yml" "$work/compose.offline.yml"
 cat > "$work/INSTALL.txt" <<TXT
 Torizon Photo Booth - offline install
 
@@ -45,12 +55,17 @@ On the board:
   docker load -i images.tar.gz
   docker compose -f compose.yml up -d
 
-If the board has no network, the Arduino toolchain cannot be downloaded and the sketch
-cannot be built, so start it without the microcontroller half instead:
+If this bundle includes compose.offline.yml, the Arduino toolchain is in it too, and the
+board needs no network at all:
+
+  docker compose -f compose.yml -f compose.offline.yml up -d
+
+If it does not, a board with no network cannot build the sketch, so start it without the
+microcontroller half instead:
 
   WITHOUT_SKETCH=1 docker compose -f compose.yml up -d
 
-Everything works except the LED on the microcontroller.
+Everything then works except the LED on the microcontroller.
 
 That is all. The App folder, the App Lab runtime, the booth and the panel are all in
 the images; nothing is installed into the operating system.
@@ -71,6 +86,6 @@ on the host daemon rather than inside the runtime:
 TXT
 
 echo "==> packing"
-( cd "$work" && zip -q -0 "$OUT" images.tar.gz compose.yml INSTALL.txt )
+( cd "$work" && zip -q -0 "$OUT" images.tar.gz compose*.yml INSTALL.txt )
 echo
 echo "wrote $OUT  ($(du -h "$OUT" | cut -f1))"

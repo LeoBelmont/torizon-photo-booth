@@ -1,0 +1,46 @@
+# syntax=docker/dockerfile:1
+# The Arduino toolchain as an image, so a board with no network can still build and flash
+# the sketch.
+#
+# Building a sketch normally downloads the arduino:zephyr core, its compiler and the
+# package and library indexes from downloads.arduino.cc on first run. On an offline board
+# that fails, and the App cannot start at all because it has a sketch. This bakes that
+# tree at build time, on a machine that does have network, and the deployment seeds it
+# onto the board.
+#
+# The compiler inside is host architecture specific, so this has to be built for the board:
+#   docker buildx build --platform linux/arm64 -f deploy/Dockerfile.toolchain -t <name> .
+#
+# It is large, roughly a gigabyte. Skip it entirely if the board can reach the internet
+# once, since the tree is cached on the host afterwards, or if you run WITHOUT_SKETCH=1.
+
+FROM debian:trixie-slim AS build
+
+ARG CORE=arduino:zephyr
+ARG TARGETARCH
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ENV ARDUINO_DIRECTORIES_DATA=/seed/.arduino15 \
+    ARDUINO_DIRECTORIES_DOWNLOADS=/seed/.arduino15/staging
+
+RUN set -eux; \
+    case "${TARGETARCH:-arm64}" in \
+        arm64) cli=ARM64 ;; \
+        amd64) cli=64bit ;; \
+        *) echo "unsupported arch ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://downloads.arduino.cc/arduino-cli/arduino-cli_latest_Linux_${cli}.tar.gz" \
+        | tar xz -C /usr/local/bin arduino-cli; \
+    arduino-cli core update-index; \
+    arduino-cli core install "${CORE}"; \
+    arduino-cli lib update-index; \
+    # The staging directory is the download cache, of no use once installed.
+    rm -rf /seed/.arduino15/staging /seed/.arduino15/tmp; \
+    du -sh /seed/.arduino15
+
+FROM busybox:stable
+COPY --from=build /seed/.arduino15 /seed/.arduino15
+CMD ["true"]

@@ -1,0 +1,41 @@
+# Overlay for a board with no network, used alongside the main file:
+#
+#   docker compose -f compose.yml -f compose.offline.yml up -d
+#
+# Building the sketch normally downloads the arduino:zephyr core, its compiler and the
+# package and library indexes from downloads.arduino.cc the first time. A board that
+# cannot reach the internet fails there, and because this App has a sketch it cannot start
+# at all. This seeds that tree from an image instead.
+#
+# It costs about a gigabyte. Two cheaper ways out, if either fits:
+#   * let the board reach the internet once; the tree is then cached on the host under
+#     the App home directory and later starts are offline anyway,
+#   * run WITHOUT_SKETCH=1, which drops the sketch and loses only the LED.
+
+services:
+  seed-toolchain:
+    image: ${TOOLCHAIN_IMAGE:-lbornia/ventuno-demo-toolchain:latest}
+    user: root
+    volumes:
+      - ${APPS_ROOT:-/var/lib/arduino-apps}:${APPS_ROOT:-/var/lib/arduino-apps}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -eu
+        home="${APPS_ROOT:-/var/lib/arduino-apps}/home"
+        if [ -d "$$home/.arduino15/packages" ]; then
+          echo "Arduino toolchain already on this board, leaving it alone"
+          exit 0
+        fi
+        mkdir -p "$$home"
+        cp -a /seed/.arduino15 "$$home/.arduino15"
+        chown -R 1000:1000 "$$home/.arduino15"
+        echo "Arduino toolchain seeded into $$home/.arduino15"
+    restart: "no"
+
+  # The sketch build must not start before the toolchain is in place.
+  start-app:
+    depends_on:
+      seed-toolchain:
+        condition: service_completed_successfully

@@ -4,6 +4,7 @@
 #   scripts/build-images.sh              build all three locally
 #   PUSH=1 scripts/build-images.sh       build and push to the registry
 #   REGISTRY=myname scripts/build-images.sh   use a different Docker Hub account
+#   WITH_TOOLCHAIN=1 scripts/build-images.sh  also build the offline Arduino toolchain
 #
 # The booth image needs the ONNX models; see scripts/build-booth.sh.
 set -euo pipefail
@@ -21,6 +22,13 @@ docker buildx build --platform linux/arm64 "${load_or_push[@]}" \
 echo "==> the App itself"
 docker buildx build --platform linux/arm64 "${load_or_push[@]}" \
     -f "$REPO/deploy/Dockerfile.app" -t "$REGISTRY/ventuno-demo-app:latest" "$REPO"
+
+# Only needed for boards with no network, and it takes a while, so it is opt-in.
+if [ "${WITH_TOOLCHAIN:-0}" = "1" ]; then
+    echo "==> Arduino toolchain (about a gigabyte, slow under emulation)"
+    docker buildx build --platform linux/arm64 "${load_or_push[@]}" \
+        -f "$REPO/deploy/Dockerfile.toolchain" -t "$REGISTRY/ventuno-demo-toolchain:latest" "$REPO"
+fi
 
 echo "==> Qt panel"
 docker buildx build --platform linux/arm64 "${load_or_push[@]}" \

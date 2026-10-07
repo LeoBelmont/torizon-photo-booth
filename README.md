@@ -123,15 +123,27 @@ board is written as a fallback, for a device tree that reports something other t
 `arduino,monza`. It covers the FQBN but not the microcontroller's reset line, so a device
 tree that identifies the board properly is still the better answer.
 
-Building the sketch needs the Arduino core and tools, which are fetched from
-`downloads.arduino.cc` the first time. On a board with no network:
+### A board with no network
+
+Nothing in the Linux half needs the internet: the images carry everything, and the App
+declares no Python dependencies the runtime image does not already provide.
+
+The sketch is the exception. Building it fetches the `arduino:zephyr` core, its compiler
+and the package and library indexes from `downloads.arduino.cc` the first time, and
+because this App has a sketch, a board that cannot reach the internet fails to start it at
+all. Three ways out, cheapest first:
 
 ```sh
+# 1. Let the board reach the internet once. The tree caches on the host afterwards.
+# 2. Run without the microcontroller half. Loses the LED, nothing else.
 WITHOUT_SKETCH=1 docker compose -f compose.yml up -d
+# 3. Carry the toolchain too. Adds about a gigabyte.
+docker compose -f compose.yml -f compose.offline.yml up -d
 ```
 
-The App then runs as a Python-only App, which needs neither the FQBN nor the toolchain.
-Everything works except the LED on the microcontroller.
+For the third, build and ship the extra image with
+`WITH_TOOLCHAIN=1 scripts/build-images.sh`. `scripts/bundle-images.sh` picks it up
+automatically if it has been built.
 
 That brings up the App Lab runtime, seeds the App from `ventuno-demo-app`, and starts it
 through `arduino-app-cli`, which creates the App's own containers on the host daemon. The
