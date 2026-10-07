@@ -38,7 +38,10 @@ else
     MODE="the runtime in a container"
     APPS_DIR="${APPS_DIR:-/var/lib/arduino-apps/apps}"
     COMPOSE=(docker compose -f "$REPO/runtime/compose.yml")
-    cli() { "${COMPOSE[@]}" exec -T arduino-app-cli arduino-app-cli "$@"; }
+    # Through the entrypoint, not straight to the binary: `docker compose exec` would
+    # run it as root, and anything it then writes into the App folder is root owned,
+    # which the App's own container (uid 1000) cannot write to afterwards.
+    cli() { "${COMPOSE[@]}" exec -T arduino-app-cli /usr/local/bin/entrypoint.sh "$@"; }
     put_app() {
         # /var/lib is root owned on a fresh board, so fall back to sudo when it has to be.
         local as=""

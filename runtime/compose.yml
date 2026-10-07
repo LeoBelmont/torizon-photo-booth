@@ -55,7 +55,9 @@ services:
       ARDUINO_APP_CLI__DATA_DIR: /var/lib/arduino-app-cli
       # Where the router's socket is, in the form the runtime looks for it.
       ARDUINO_APP_CLI__REQUIRED_RUNTIMES: arduino/arduino-router
-      ARDUINO_APP_CLI__ALLOW_ROOT: "1"
+      # Deliberately absent: ARDUINO_APP_CLI__ALLOW_ROOT. The runtime must drop to uid
+      # 1000, as it does on a board, or the files it writes into an App folder are root
+      # owned and the App's own container cannot write them.
       DAEMON_PORT: "8800"
     volumes:
       # Creates the App's containers on the host.
