@@ -130,12 +130,17 @@ On the **Arduino image**, `arduino-app-cli` is already installed, so the script 
 the App lands in `~/ArduinoApps/photo-booth`. App Lab on a PC sees the App too, so you can
 open it, edit it and press Run.
 
-On **Torizon OS**, there is no `arduino-app-cli` in the rootfs and no way to apt-install
-one. The script brings up `runtime/compose.yml` instead, which runs the runtime in a
-container, and the App lands in `/var/lib/arduino-apps/apps/photo-booth`. Everything after
-that is identical, including the Bricks, the sketch and the Bridge to the microcontroller.
-See [runtime/README.md](runtime/README.md) for how that container is wired, and
-[what a Torizon build still needs](#what-a-torizon-os-build-needs) for the kernel side.
+On **Torizon OS**, nothing Arduino is installed in the rootfs, by design: no
+`arduino-app-cli`, no `arduino-router`, no apt to add them with. The script brings up
+`runtime/compose.yml` instead, which runs both from containers, and the App lands in
+`/var/lib/arduino-apps/apps/photo-booth`. Everything after that is identical, including the
+Bricks, the sketch and the Bridge to the microcontroller. Docker is the only thing the OS
+has to provide. See [runtime/README.md](runtime/README.md) for how that container is wired,
+and [what a Torizon build still needs](#what-a-torizon-os-build-needs) for the kernel side.
+
+The script picks between the two by looking for `arduino-app-cli` on `PATH`. `RUNTIME=container`
+forces the containerized one even where a host install exists, and `RUNTIME=host` requires
+the installed one, so what is being demonstrated never depends on an accident of the image.
 
 ### Without App Lab at all
 

@@ -12,13 +12,24 @@
 #   scripts/photo-booth.sh status
 #
 # APPS_ROOT moves the App directory; FREE_DISPLAY=1 lets it stop a running desktop.
+# RUNTIME=container forces the containerized runtime even where one is installed on the
+# host; RUNTIME=host requires the installed one. The default picks whichever fits.
 #   scripts/photo-booth.sh cli <args> any other arduino-app-cli command
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME=photo-booth
 
-if command -v arduino-app-cli >/dev/null 2>&1; then
+# Which runtime to use. The default is to use a host arduino-app-cli if there is one,
+# which is the Arduino image, and the containerized runtime otherwise, which is Torizon,
+# where nothing Arduino is installed in the rootfs by design. RUNTIME=container|host
+# forces it, so a stray host install cannot quietly change what is being demonstrated.
+case "${RUNTIME:-auto}" in
+    auto|host|container) ;;
+    *) echo "RUNTIME must be auto, host or container (got '${RUNTIME}')" >&2; exit 2 ;;
+esac
+if [ "${RUNTIME:-auto}" = host ] || { [ "${RUNTIME:-auto}" = auto ] && command -v arduino-app-cli >/dev/null 2>&1; }; then
+    command -v arduino-app-cli >/dev/null 2>&1 || { echo "RUNTIME=host but arduino-app-cli is not installed" >&2; exit 2; }
     MODE="the runtime installed on this image"
     APPS_DIR="${APPS_DIR:-$HOME/ArduinoApps}"
     cli() { arduino-app-cli "$@"; }
