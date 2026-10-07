@@ -36,7 +36,10 @@ if [ "${RUNTIME:-auto}" = host ] || { [ "${RUNTIME:-auto}" = auto ] && command -
     put_app() { mkdir -p "$APPS_DIR"; rm -rf "${APPS_DIR:?}/$APP_NAME"; cp -a "$REPO/app" "$APPS_DIR/$APP_NAME"; }
 else
     MODE="the runtime in a container"
-    APPS_DIR="${APPS_DIR:-/var/lib/arduino-apps/apps}"
+    # APPS_ROOT is the single knob: it has to move the script's idea of where Apps live
+    # and the runtime's together, or the App is installed in one place and the runtime
+    # looks in another.
+    APPS_DIR="${APPS_DIR:-${APPS_ROOT:-/var/lib/arduino-apps}/apps}"
     COMPOSE=(docker compose -f "$REPO/runtime/compose.yml")
     # Through the entrypoint, not straight to the binary: `docker compose exec` would
     # run it as root, and anything it then writes into the App folder is root owned,
