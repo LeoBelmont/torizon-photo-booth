@@ -1,0 +1,71 @@
+# The whole demo, from a registry, on a board with nothing installed on it.
+#
+#   docker compose -f deploy/compose.yml up -d
+#
+# Everything runs in containers: the App Lab runtime, the App's own containers, and the
+# App folder itself, which arrives as an image rather than being copied onto the board.
+# Torizon OS needs only Docker.
+#
+# What comes up, in order:
+#   arduino-router    bridges the App's Python to the microcontroller
+#   arduino-app-cli   the App Lab daemon, so App Lab on a PC can connect
+#   seed-app          one shot: puts the App folder in place from its image
+#   start-app         one shot: arduino-app-cli app start, which creates the App's
+#                     own containers on the host daemon as siblings of these
+#
+# The App's containers outlive this stack: `docker compose -f deploy/compose.yml down`
+# removes the runtime and leaves the demo running. Stop the demo itself with
+#   docker compose -f deploy/compose.yml run --rm start-app app stop /var/lib/arduino-apps/apps/photo-booth
+#
+# The display: the panel draws straight to KMS and needs it to itself. That is the normal
+# state on Torizon. On a board running a desktop, stop it first.
+
+include:
+  - ../runtime/compose.yml
+
+services:
+  seed-app:
+    image: ${APP_IMAGE:-lbornia/ventuno-demo-app:latest}
+    user: root
+    volumes:
+      - ${APPS_ROOT:-/var/lib/arduino-apps}:${APPS_ROOT:-/var/lib/arduino-apps}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -eu
+        apps="${APPS_ROOT:-/var/lib/arduino-apps}/apps"
+        mkdir -p "$$apps"
+        rm -rf "$$apps/photo-booth"
+        cp -a /app-src "$$apps/photo-booth"
+        chown -R 1000:1000 "$$apps/photo-booth"
+        echo "App seeded into $$apps/photo-booth"
+    restart: "no"
+
+  start-app:
+    image: ${RUNTIME_IMAGE:-lbornia/arduino-app-runtime:latest}
+    depends_on:
+      seed-app:
+        condition: service_completed_successfully
+      arduino-router:
+        condition: service_started
+    network_mode: host
+    environment:
+      ARDUINO_APP_CLI__APPS_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/apps
+      ARDUINO_APP_CLI__RELEASES_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/releases
+      ARDUINO_APP_CLI__DATA_DIR: /var/lib/arduino-app-cli
+      ARDUINO_APP_CLI__REQUIRED_RUNTIMES: arduino/arduino-router
+      APP_HOME_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/home
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/group:/etc/group:ro
+      - /etc/passwd:/etc/passwd:ro
+      - /sys:/sys:ro
+      - /dev:/dev
+      - ${APPS_ROOT:-/var/lib/arduino-apps}:${APPS_ROOT:-/var/lib/arduino-apps}
+      - /var/lib/arduino-app-cli:/var/lib/arduino-app-cli
+      - /run/arduino:/run/arduino
+      - /usr/share/qcom:/usr/share/qcom:ro
+      - /run/user/1000:/run/user/1000
+    command: ["app", "start", "${APPS_ROOT:-/var/lib/arduino-apps}/apps/photo-booth"]
+    restart: "no"

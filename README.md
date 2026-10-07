@@ -85,7 +85,8 @@ Three things are easy to get wrong:
 | `Dockerfile` | The booth image, on Arduino's `qairt-common-base`. |
 | `docker-compose.yml` | The two containers on their own, for bring-up and debugging. Not the way the demo runs. |
 | `runtime/` | The App Lab runtime (`arduino-app-cli`, `arduino-router`) as a container, so Torizon OS needs nothing installed into the rootfs. |
-| `scripts/` | `photo-booth.sh` to run the App on either board, `check-board.sh` to check a board before you try, plus `build-booth.sh`, `build-qt-ui.sh`, `export-app.sh`. |
+| `deploy/` | `compose.yml`, the whole demo from a registry on a board with only Docker, and `Dockerfile.app`, which carries the App folder as an image so nothing has to be copied. |
+| `scripts/` | `photo-booth.sh` to run the App on either board, `check-board.sh` to check a board before you try, `build-images.sh` to build and push everything, plus `build-booth.sh`, `build-qt-ui.sh`, `export-app.sh`. |
 | `effects/`, `templates/` | The effect pack and the character portraits it names. |
 
 ## Building
@@ -101,6 +102,28 @@ PUSH=1 scripts/build-qt-ui.sh     # lbornia/ventuno-demo-booth-ui:latest
 
 Without `PUSH=1` the images stay local; `BOARD=arduino@<ip>` loads them onto a board over
 SSH instead of going through a registry. Both build for arm64, under emulation on an x86 PC.
+
+## Deploying it from a registry
+
+The short version, for a board with nothing on it but Docker. Copy one file and run one
+command; every piece, including the App folder itself, arrives as an image:
+
+```sh
+scp deploy/compose.yml runtime/compose.yml torizon@<board>:~/photo-booth/
+ssh torizon@<board> 'cd photo-booth && docker compose -f deploy/compose.yml up -d'
+```
+
+That brings up the App Lab runtime, seeds the App from `ventuno-demo-app`, and starts it
+through `arduino-app-cli`, which creates the App's own containers on the host daemon. The
+App outlives the stack, so `docker compose -f deploy/compose.yml down` removes the runtime
+and leaves the demo running.
+
+To build and publish the images in the first place:
+
+```sh
+docker login
+PUSH=1 scripts/build-images.sh            # or REGISTRY=<account> PUSH=1 scripts/build-images.sh
+```
 
 ## Running
 
