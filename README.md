@@ -9,12 +9,17 @@ the face swap runs on the board's **Hexagon NPU**, and a native **Qt 6** panel r
 the Weston + Chromium pair of the Jetson build. The Jetson/TensorRT version lives on
 `main`; the two share no files here.
 
-**Torizon OS is the target.** The board has no desktop there, which is what the panel
-wants: it takes the display directly, with no compositor in the way. The same App also
-runs on the VENTUNO Q's stock Ubuntu image, where the desktop has to be moved aside
-first. Running unchanged on both is the
+**The point of the demo** is that it was built as an Arduino App Lab App on the VENTUNO Q's
+stock Ubuntu image, and the same App then runs on Torizon OS on the same board. That is the
 [Works with Arduino](https://www.arduino.cc/pro/works-with-arduino/) story on Toradex
-hardware.
+hardware: build it the Arduino way, ship it the Toradex way, without rewriting it.
+
+Torizon is the target of the two. The board has no desktop there, which is what the panel
+wants, since it takes the display directly with no compositor in the way. On the Ubuntu
+image the desktop has to be moved aside first.
+
+Running it on a board for the first time: `scripts/check-board.sh` reports whether that
+board has what the demo needs, and says what degrades if something is missing.
 
 ## How it is put together
 
@@ -80,7 +85,7 @@ Three things are easy to get wrong:
 | `Dockerfile` | The booth image, on Arduino's `qairt-common-base`. |
 | `docker-compose.yml` | The two containers on their own, for bring-up and debugging. Not the way the demo runs. |
 | `runtime/` | The App Lab runtime (`arduino-app-cli`, `arduino-router`) as a container, so Torizon OS needs nothing installed into the rootfs. |
-| `scripts/` | `photo-booth.sh` to run the App on either board, plus `build-booth.sh`, `build-qt-ui.sh`, `export-app.sh`. |
+| `scripts/` | `photo-booth.sh` to run the App on either board, `check-board.sh` to check a board before you try, plus `build-booth.sh`, `build-qt-ui.sh`, `export-app.sh`. |
 | `effects/`, `templates/` | The effect pack and the character portraits it names. |
 
 ## Building
