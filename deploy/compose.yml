@@ -1,29 +1,96 @@
-# The whole demo, from a registry, on a board with nothing installed on it.
+# The whole demo, from a registry, on a board with nothing installed on it but Docker.
 #
-#   docker compose -f deploy/compose.yml up -d
+#   docker compose -f compose.yml up -d
 #
-# Everything runs in containers: the App Lab runtime, the App's own containers, and the
-# App folder itself, which arrives as an image rather than being copied onto the board.
-# Torizon OS needs only Docker.
+# This file is standalone: copy it to the board on its own and it brings up everything.
+# Every piece arrives as an image, including the App folder itself, so nothing else has
+# to be copied and nothing is installed into the operating system.
 #
 # What comes up, in order:
 #   arduino-router    bridges the App's Python to the microcontroller
 #   arduino-app-cli   the App Lab daemon, so App Lab on a PC can connect
 #   seed-app          one shot: puts the App folder in place from its image
-#   start-app         one shot: arduino-app-cli app start, which creates the App's
-#                     own containers on the host daemon as siblings of these
+#   start-app         one shot: arduino-app-cli app start, which creates the App's own
+#                     containers on the host daemon as siblings of these
 #
-# The App's containers outlive this stack: `docker compose -f deploy/compose.yml down`
-# removes the runtime and leaves the demo running. Stop the demo itself with
-#   docker compose -f deploy/compose.yml run --rm start-app app stop /var/lib/arduino-apps/apps/photo-booth
+# The App's containers outlive this stack: `docker compose down` removes the runtime and
+# leaves the demo running. Stop the demo itself with
+#   docker compose run --rm start-app app stop /var/lib/arduino-apps/apps/photo-booth
+#
+# The two runtime services below are the same ones in runtime/compose.yml, inlined so
+# this file stands alone. Change one, change the other.
+#
+# Why the runtime's mounts look like this: arduino-app-cli creates the App's containers
+# through the host's Docker socket, as siblings rather than children, so the paths it
+# writes into the generated compose files are host paths, while the host facts it
+# resolves are read from inside its own container. The two only agree if the App
+# directory is mounted at an identical path, /etc/group and /etc/passwd come from the
+# host so group names resolve to the host's numeric ids, /sys is visible for device
+# majors and the device tree, and anything probed with "mount this if the board has it"
+# is visible where it is looked for.
 #
 # The display: the panel draws straight to KMS and needs it to itself. That is the normal
-# state on Torizon. On a board running a desktop, stop it first.
-
-include:
-  - ../runtime/compose.yml
+# state on Torizon. On a board running a desktop, stop the desktop first.
 
 services:
+  # Bridges the App's Python to the microcontroller. Drop this service on a board with no
+  # MCU; Python-only Apps do not need it.
+  arduino-router:
+    image: ${RUNTIME_IMAGE:-lbornia/arduino-app-runtime:latest}
+    command: ["router"]
+    network_mode: host
+    environment:
+      # VENTUNO Q: the STM32H5 is on /dev/ttySTM0. Leave empty for no microcontroller.
+      SERIAL_PORT: ${SERIAL_PORT:-/dev/ttySTM0}
+      SERIAL_BAUDRATE: "115200"
+      # Put the micro in a ready state, as the board's own systemd drop-in does.
+      MCU_READY_GPIO: ${MCU_READY_GPIO:--c2 -t0 47=0}
+    volumes:
+      - /dev:/dev
+      # The socket lands on the host here, so the App's containers can mount it.
+      - /run/arduino:/run/arduino
+    device_cgroup_rules:
+      - "c 4:* rmw"     # tty
+      - "c 254:* rmw"   # gpiochip
+    restart: unless-stopped
+
+  arduino-app-cli:
+    image: ${RUNTIME_IMAGE:-lbornia/arduino-app-runtime:latest}
+    command: ["daemon"]
+    network_mode: host
+    depends_on:
+      - arduino-router
+    environment:
+      # APPS_ROOT moves all of this elsewhere; it only has to be one path, because the
+      # same path has to exist on the host and in the container.
+      ARDUINO_APP_CLI__APPS_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/apps
+      ARDUINO_APP_CLI__RELEASES_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/releases
+      APP_HOME_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/home
+      ARDUINO_APP_CLI__DATA_DIR: /var/lib/arduino-app-cli
+      # Where the router's socket is, in the form the runtime looks for it.
+      ARDUINO_APP_CLI__REQUIRED_RUNTIMES: arduino/arduino-router
+      # Deliberately absent: ARDUINO_APP_CLI__ALLOW_ROOT. The runtime must drop to uid
+      # 1000, as it does on a board, or the files it writes into an App folder are root
+      # owned and the App's own container cannot write them.
+      DAEMON_PORT: "8800"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/group:/etc/group:ro
+      - /etc/passwd:/etc/passwd:ro
+      - /sys:/sys:ro
+      - /dev:/dev
+      - ${APPS_ROOT:-/var/lib/arduino-apps}:${APPS_ROOT:-/var/lib/arduino-apps}
+      - /var/lib/arduino-app-cli:/var/lib/arduino-app-cli
+      - /run/arduino:/run/arduino
+      - /usr/share/qcom:/usr/share/qcom:ro
+      - /run/user/1000:/run/user/1000
+    device_cgroup_rules:
+      - "c 4:* rmw"     # tty, for flashing
+      - "c 254:* rmw"   # gpiochip, for the micro's reset line
+    restart: unless-stopped
+
+  # The App folder travels as an image, so the board needs nothing copied onto it. This
+  # lays it down owned by the uid the App's containers run as, then exits.
   seed-app:
     image: ${APP_IMAGE:-lbornia/ventuno-demo-app:latest}
     user: root
@@ -42,6 +109,8 @@ services:
         echo "App seeded into $$apps/photo-booth"
     restart: "no"
 
+  # Starts the App the App Lab way, which compiles and flashes the sketch and creates the
+  # App's own containers. Exits when the App is up.
   start-app:
     image: ${RUNTIME_IMAGE:-lbornia/arduino-app-runtime:latest}
     depends_on:
@@ -53,9 +122,9 @@ services:
     environment:
       ARDUINO_APP_CLI__APPS_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/apps
       ARDUINO_APP_CLI__RELEASES_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/releases
+      APP_HOME_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/home
       ARDUINO_APP_CLI__DATA_DIR: /var/lib/arduino-app-cli
       ARDUINO_APP_CLI__REQUIRED_RUNTIMES: arduino/arduino-router
-      APP_HOME_DIR: ${APPS_ROOT:-/var/lib/arduino-apps}/home
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/group:/etc/group:ro
