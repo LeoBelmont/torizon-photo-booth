@@ -45,6 +45,13 @@ On the board:
   docker load -i images.tar.gz
   docker compose -f compose.yml up -d
 
+If the board has no network, the Arduino toolchain cannot be downloaded and the sketch
+cannot be built, so start it without the microcontroller half instead:
+
+  WITHOUT_SKETCH=1 docker compose -f compose.yml up -d
+
+Everything works except the LED on the microcontroller.
+
 That is all. The App folder, the App Lab runtime, the booth and the panel are all in
 the images; nothing is installed into the operating system.
 

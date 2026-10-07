@@ -113,7 +113,20 @@ scp deploy/compose.yml torizon@<board>:~/
 ssh torizon@<board> 'docker compose -f compose.yml up -d'
 ```
 
-`deploy/compose.yml` is standalone, so that one file is the whole deployment.
+`deploy/compose.yml` is standalone, so that one file is the whole deployment. It also
+writes a `platform.json` naming the board, because the runtime identifies a board from the
+device tree and a Torizon build that reports something other than `arduino,monza` would
+otherwise fail to start an App that has a sketch, with `Missing FQBN`.
+
+Building the sketch needs the Arduino core and tools, which are fetched from
+`downloads.arduino.cc` the first time. On a board with no network:
+
+```sh
+WITHOUT_SKETCH=1 docker compose -f compose.yml up -d
+```
+
+The App then runs as a Python-only App, which needs neither the FQBN nor the toolchain.
+Everything works except the LED on the microcontroller.
 
 That brings up the App Lab runtime, seeds the App from `ventuno-demo-app`, and starts it
 through `arduino-app-cli`, which creates the App's own containers on the host daemon. The

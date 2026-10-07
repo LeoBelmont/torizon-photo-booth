@@ -90,22 +90,45 @@ services:
     restart: unless-stopped
 
   # The App folder travels as an image, so the board needs nothing copied onto it. This
-  # lays it down owned by the uid the App's containers run as, then exits.
+  # lays it down owned by the uid the App's containers run as, writes a platform.json if
+  # the board does not identify itself, and exits.
   seed-app:
     image: ${APP_IMAGE:-lbornia/ventuno-demo-app:latest}
     user: root
+    environment:
+      # The runtime identifies the board from the device tree compatible string and
+      # expects arduino,monza. A Torizon build that reports something else leaves it with
+      # no FQBN, and starting an App that has a sketch then fails with "Missing FQBN".
+      # This writes the override, unless the host already has one.
+      BOARD_NAME: ${BOARD_NAME:-ventunoq}
+      BOARD_FQBN: ${BOARD_FQBN:-arduino:zephyr:ventunoq}
+      # Building the sketch needs the Arduino core and tools from downloads.arduino.cc on
+      # first run. Set WITHOUT_SKETCH=1 on a board with no network: the App then runs as a
+      # Python-only App, which needs neither the FQBN nor the toolchain. Everything works
+      # except the LED on the microcontroller.
+      WITHOUT_SKETCH: ${WITHOUT_SKETCH:-0}
     volumes:
       - ${APPS_ROOT:-/var/lib/arduino-apps}:${APPS_ROOT:-/var/lib/arduino-apps}
+      - /var/lib/arduino-app-cli:/var/lib/arduino-app-cli
     entrypoint:
       - sh
       - -c
       - |
         set -eu
         apps="${APPS_ROOT:-/var/lib/arduino-apps}/apps"
-        mkdir -p "$$apps"
+        mkdir -p "$$apps" /var/lib/arduino-app-cli
         rm -rf "$$apps/photo-booth"
         cp -a /app-src "$$apps/photo-booth"
+        if [ "$$WITHOUT_SKETCH" = "1" ]; then
+          rm -rf "$$apps/photo-booth/sketch"
+          echo "sketch left out: the App will run without the microcontroller"
+        fi
         chown -R 1000:1000 "$$apps/photo-booth"
+        if [ ! -f /var/lib/arduino-app-cli/platform.json ]; then
+          printf '{\n  "board_name": "%s",\n  "fqbn": "%s"\n}\n' "$$BOARD_NAME" "$$BOARD_FQBN" \
+            > /var/lib/arduino-app-cli/platform.json
+          echo "wrote platform.json for $$BOARD_NAME"
+        fi
         echo "App seeded into $$apps/photo-booth"
     restart: "no"
 
