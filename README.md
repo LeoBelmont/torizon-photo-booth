@@ -113,10 +113,15 @@ scp deploy/compose.yml torizon@<board>:~/
 ssh torizon@<board> 'docker compose -f compose.yml up -d'
 ```
 
-`deploy/compose.yml` is standalone, so that one file is the whole deployment. It also
-writes a `platform.json` naming the board, because the runtime identifies a board from the
-device tree and a Torizon build that reports something other than `arduino,monza` would
-otherwise fail to start an App that has a sketch, with `Missing FQBN`.
+`deploy/compose.yml` is standalone, so that one file is the whole deployment.
+
+Two things in it exist because of how a container sees the host. Docker masks
+`/sys/firmware` by default, so the runtime cannot read the device tree and identifies no
+board at all, which fails any App with a sketch on `Missing FQBN`; the services that need
+the board therefore run with `systempaths=unconfined`. And a `platform.json` naming the
+board is written as a fallback, for a device tree that reports something other than
+`arduino,monza`. It covers the FQBN but not the microcontroller's reset line, so a device
+tree that identifies the board properly is still the better answer.
 
 Building the sketch needs the Arduino core and tools, which are fetched from
 `downloads.arduino.cc` the first time. On a board with no network:

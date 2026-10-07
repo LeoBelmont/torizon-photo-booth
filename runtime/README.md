@@ -60,7 +60,14 @@ Everything left is kernel and firmware, which no container can provide:
 ## Board identity
 
 The runtime reads the device tree `compatible` string and expects `arduino,monza` for the
-VENTUNO Q. If the Torizon device tree reports something else, the log says so:
+VENTUNO Q. Two things can stop that working in a container.
+
+First, **Docker masks `/sys/firmware`**, so a container sees it empty no matter what the
+host has, and the runtime finds no board at all. The services that identify the board run
+with `systempaths=unconfined` for this reason. Without it the log reads
+`detected platform compatible=[]` and anything needing the FQBN fails.
+
+Second, the device tree may genuinely report something else. Then the log says:
 
 ```
 WARN not supported platform compatible=[...]

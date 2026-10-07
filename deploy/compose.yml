@@ -58,8 +58,20 @@ services:
     image: ${RUNTIME_IMAGE:-lbornia/arduino-app-runtime:latest}
     command: ["daemon"]
     network_mode: host
+    # Docker masks /sys/firmware by default, so a container cannot read the device tree
+    # and the runtime ends up with no board, no FQBN and no microcontroller reset line.
+    # Starting an App that has a sketch then fails with "Missing FQBN". This unmasks it so
+    # the board identifies itself the same way it does when the runtime is installed on
+    # the host. platform.json below is the fallback if the device tree says something
+    # other than arduino,monza.
+    security_opt:
+      - systempaths=unconfined
     depends_on:
-      - arduino-router
+      arduino-router:
+        condition: service_started
+      # It mounts a file seed-app writes, so that has to have run first.
+      seed-app:
+        condition: service_completed_successfully
     environment:
       # APPS_ROOT moves all of this elsewhere; it only has to be one path, because the
       # same path has to exist on the host and in the container.
@@ -136,6 +148,14 @@ services:
   # App's own containers. Exits when the App is up.
   start-app:
     image: ${RUNTIME_IMAGE:-lbornia/arduino-app-runtime:latest}
+    # Docker masks /sys/firmware by default, so a container cannot read the device tree
+    # and the runtime ends up with no board, no FQBN and no microcontroller reset line.
+    # Starting an App that has a sketch then fails with "Missing FQBN". This unmasks it so
+    # the board identifies itself the same way it does when the runtime is installed on
+    # the host. platform.json below is the fallback if the device tree says something
+    # other than arduino,monza.
+    security_opt:
+      - systempaths=unconfined
     depends_on:
       seed-app:
         condition: service_completed_successfully

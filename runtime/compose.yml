@@ -44,6 +44,10 @@ services:
     image: ${RUNTIME_IMAGE:-lbornia/arduino-app-runtime:latest}
     command: ["daemon"]
     network_mode: host
+    # Docker masks /sys/firmware, so without this the runtime cannot read the device tree
+    # and identifies no board, which breaks anything needing the FQBN.
+    security_opt:
+      - systempaths=unconfined
     depends_on:
       - arduino-router
     environment:
